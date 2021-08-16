@@ -1,0 +1,123 @@
+SSTACK  SEGMENT STACK 
+DW 64 DUP(?) 
+SSTACK  ENDS 
+DATA  SEGMENT 
+	TABLE1  DB  3FH,06H,5BH,4FH,66H,6DH,7DH,07H,7FH,6FH ;数码管表
+	BCD   	DB   0,0,0
+	VOLTAGE DB  0 
+DATA  ENDS
+CODE  SEGMENT 
+ASSUME CS:CODE, DS:DATA 
+	START:  MOV AX, DATA 
+	   MOV DS, AX 
+	   CALL GET 
+	   CALL JUG    
+	   CALL CHBCD 
+	   CALL PRT   
+	   JMP START 
+	;BCD转换子程序,OK  
+	CHBCD:  
+	   LEA BX, TABLE1 
+	   LEA SI, BCD 
+	   MOV CX,3     
+	   MOV AL, VOLTAGE 
+	   XOR AH, AH 
+	LOOP2:
+	   MOV DL, 51
+	   DIV DL       
+       XLAT     
+       MOV [SI], AL  
+	   INC SI 
+	   MOV AL, AH
+	   XOR AH, AH 
+	   MOV DL, 10 
+	   MUL DL 
+	   LOOP LOOP2    
+	   RET
+	;A/D转换子程序   
+	GET: 
+	   MOV	DX, 0640H     
+	   OUT	DX, AL          
+	   CALL	DALLY            
+	   IN	AL, DX       
+	   MOV	VOLTAGE, AL     
+	   RET
+	;源程序，显示程序段
+	PRT: 
+	   MOV DX, 06C6H       
+	   MOV AL, 80H              
+	   OUT DX, AL 
+	   MOV BH,0FEH
+	   MOV BL,09H
+	aa1:
+	   MOV CX, 100H 	
+	LOOP3: 
+	   LEA SI, BCD 
+	   MOV AH, 0FEH         
+	LOOP4:
+	   MOV AL, AH 
+	   MOV DX, 06C2H      
+	   OUT DX, AL 
+	   MOV AL, [SI] 		
+	   CMP AH,BH	 		
+	   JNZ NEXT1 
+	   OR AL, 80H         
+	NEXT1:
+	   MOV DX,06C0H       
+	   OUT DX, AL 
+	   CALL DALLY 
+	   ROL AH, 1 		
+	   INC SI 			
+	   CMP AH, 0F7H 		
+	   JNZ LOOP4  
+	   LOOP LOOP3 
+	   ROL BH,1
+	   cmp bh,11110111b
+	   jnz bb1
+	   mov bh,11111110b
+	bb1:
+	   DEC BL
+	   jnz aa1
+	   ;call DALLY
+	   RET
+  ;延时程序	   
+	DALLY:  
+	   PUSH CX          
+	   PUSH AX 
+	   MOV CX, 10H 
+	D77:
+	   MOV AX, 10H 
+	D88:
+	   DEC AX 
+	   JNZ D88 
+	   LOOP D77
+	   POP AX 
+	   POP CX 
+	   RET  
+	;报警程序段,OK        
+	JUG: 
+	   PUSH CX 
+	   PUSH AX 
+	   MOV AL, VOLTAGE  
+	   CMP AL, 0E5H     
+	   JNB NEXT2       
+	   MOV DX, 0687H 	
+	   MOV AL, 36H 		
+	   OUT DX, AL
+	   JMP NEXT3 
+	NEXT2:
+	   MOV DX, 0687H  	
+	   MOV AL, 36H    
+	   OUT DX, AL              
+	   MOV AX,1500 
+	   MOV DX, 0681H     ;计数器0 送初值
+	   OUT DX, AL
+	   MOV AL,AH
+	   OUT DX,AL
+	   CALL DALLY
+	NEXT3:   
+	   POP AX 
+	   POP CX 
+	   RET 	   
+CODE  ENDS 
+   	   END START
